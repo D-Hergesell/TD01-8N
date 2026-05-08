@@ -5,14 +5,18 @@ class GraphService {
     constructor() {
         this.graph = new Map();
         this.actorsList = new Set();
+        this.moviesData = [];
         this.buildGraph();
     }
 
     buildGraph() {
         const dataPath = path.join(__dirname, '../../data/latest_movies.json');
-        const moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+        
+        // Salvamos na classe
+        this.moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
-        moviesData.forEach(movie => {
+        // CORREÇÃO AQUI: Faltava o "this." bem no começo desta linha!
+        this.moviesData.forEach(movie => {
             const movieNode = `Filme: ${movie.title}`;
             if (!this.graph.has(movieNode)) {
                 this.graph.set(movieNode, new Set());
@@ -214,6 +218,32 @@ class GraphService {
             message: allPaths.length === 0 ? `Nenhum relacionamento com exatamente ${exactDepth} conexões encontrado.` : undefined
         };
     }
+
+    getFullGraphData() {
+    const nodes = Array.from(this.actorsList).map(actor => ({ 
+        data: { id: actor, label: actor } 
+    }));
+    
+    const edgesMap = new Map();
+
+    // Lógica para contar as conexões (arestas) entre atores
+    this.moviesData.forEach(movie => {
+        const cast = movie.cast;
+        for (let i = 0; i < cast.length; i++) {
+            for (let j = i + 1; j < cast.length; j++) {
+                const pair = [cast[i], cast[j]].sort().join('---');
+                edgesMap.set(pair, (edgesMap.get(pair) || 0) + 1);
+            }
+        }
+    });
+
+    const edges = Array.from(edgesMap.entries()).map(([pair, weight]) => {
+        const [source, target] = pair.split('---');
+        return { data: { source, target, weight, label: weight } };
+    });
+
+    return { nodes, edges };
+}
 }
 
 module.exports = new GraphService();

@@ -1,6 +1,15 @@
 const graphService = require('../services/graphService');
 
 class GraphController {
+
+    getGraphData (req, res) {
+    try {
+        const graphData = graphService.getFullGraphData();
+        res.json(graphData);
+    } catch (error) {
+        res.status(500).json({ error: 'Erro ao gerar dados do grafo.' });
+    }
+}
     getActors(req, res) {
         try {
             const actors = graphService.getAllActors();
@@ -89,6 +98,8 @@ class GraphController {
             res.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
         }
     }
+
+    
 }
 
 module.exports = new GraphController();

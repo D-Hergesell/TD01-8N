@@ -17,7 +17,7 @@ body {
     height: 100vh;
     margin: 0;
     overflow: hidden; /* Impede o scroll da página inteira */
-   /*background: url(https://i.imgur.com/Zk6TR5k.jpg) no-repeat center center;*/
+  
     background: url('../../images/winxp.jpg');
     background-size: cover;
     display: flex;

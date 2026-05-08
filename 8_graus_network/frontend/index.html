@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>8 Graus de Network</title>
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
 </head>
 <body>
     <main class="container">
@@ -35,6 +36,12 @@
                 <button type="button" id="find-shortest-btn" class="button">Encontrar Caminho Mais Curto</button>
                 <button type="button" id="find-all-shortest-btn" class="button">Ver Todos os Caminhos Curtos (máx. 8)</button>
             </div>
+
+            <div class="actions">
+    <button id="btnShowGraph" class="secondary-btn">Mostrar Grafo Completo</button>
+</div>
+
+<div id="cy" style="width: 100%; height: 600px; border: 1px solid #ccc; margin-top: 20px; display: none;"></div>
         </form>
 
         <section id="results-container" aria-live="polite">
@@ -42,7 +49,7 @@
         </section>
     </main>
 
-    <script src="js/app.js"></script>
+   
 
     <!-- Barra de Tarefas do Windows XP -->
     <footer class="taskbar">
@@ -58,5 +65,7 @@
         </div>
         <div class="tray-clock" id="clock"></div>
     </footer>
+       <script src="js/app.js"></script>
 </body>
+
 </html>
