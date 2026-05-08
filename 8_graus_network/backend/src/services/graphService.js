@@ -12,33 +12,23 @@ class GraphService {
     buildGraph() {
         const dataPath = path.join(__dirname, '../../data/latest_movies.json');
         
-        try {
-            this.moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-        } catch (error) {
-            console.error("Erro ao carregar dados:", error);
-            return;
-        }
+        // Salvamos na classe
+        this.moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
         this.moviesData.forEach(movie => {
-            // Identificação única por ID para evitar colisões de títulos homônimos
-            const movieNode = `Filme: ${movie.title.trim()} (ID: ${movie.id})`;
-            
+            const movieNode = `Filme: ${movie.title}`;
             if (!this.graph.has(movieNode)) {
                 this.graph.set(movieNode, new Set());
             }
 
-            // Limpeza de duplicatas no elenco dentro do mesmo filme
-            const uniqueCast = [...new Set(movie.cast.map(a => a.trim()))];
-
-            uniqueCast.forEach(actorName => {
-                const actorNode = `Ator: ${actorName}`;
-                this.actorsList.add(actorName);
+            movie.cast.forEach(actor => {
+                const actorNode = `Ator: ${actor}`;
+                this.actorsList.add(actor);
 
                 if (!this.graph.has(actorNode)) {
                     this.graph.set(actorNode, new Set());
                 }
 
-                // Conexões bidirecionais
                 this.graph.get(movieNode).add(actorNode);
                 this.graph.get(actorNode).add(movieNode);
             });
@@ -50,24 +40,27 @@ class GraphService {
     }
 
     /**
-     * Encontra TODOS os caminhos mais curtos entre dois atores usando BFS + DFS Otimizado.
+     * Encontra TODOS os caminhos mais curtos entre dois atores usando BFS + DFS.
+     * @param {string} sourceActor - O nome do ator de origem.
+     * @param {string} targetActor - O nome do ator de destino.
+     * @param {number} maxDepth - A profundidade máxima da busca.
+     * @returns {object} - Um objeto com a distância e uma lista de todos os caminhos mais curtos.
      */
-    findAllShortestPaths(sourceActor, targetActor, maxDepth = 16) {
-        const startNode = `Ator: ${sourceActor.trim()}`;
-        const endNode = `Ator: ${targetActor.trim()}`;
+    findAllShortestPaths(sourceActor, targetActor, maxDepth = 8) {
+        const startNode = `Ator: ${sourceActor}`;
+        const endNode = `Ator: ${targetActor}`;
 
         if (!this.graph.has(startNode) || !this.graph.has(endNode)) {
-            return { error: 'Ator não encontrado no sistema.' };
+            return { error: 'Um ou ambos os atores não foram encontrados no grafo.' };
         }
 
-        // Passo 1: BFS para mapear distâncias
+        // Passo 1: BFS para encontrar as distâncias de todos os nós a partir da origem.
         const distances = new Map();
         const queue = [startNode];
         distances.set(startNode, 0);
 
-        let head = 0; 
-        while (head < queue.length) {
-            const u = queue[head++];
+        while (queue.length > 0) {
+            const u = queue.shift();
             const distU = distances.get(u);
 
             if (distU >= maxDepth) continue;
@@ -81,16 +74,16 @@ class GraphService {
             }
         }
 
+        // Passo 2: Verificar se o destino foi alcançado e reconstruir os caminhos com DFS.
         if (!distances.has(endNode)) {
-            return { distance: -1, paths: [], message: "Sem conexão no limite de profundidade." };
+            return { distance: -1, paths: [], message: `Nenhum relacionamento encontrado com menos de ${maxDepth} arestas.` };
         }
 
         const shortestDist = distances.get(endNode);
         const allPaths = [];
 
-        // Passo 2: DFS para reconstruir todos os caminhos mínimos
         const findPathsDfs = (currentNode, currentPath) => {
-            currentPath.unshift(currentNode);
+            currentPath.unshift(currentNode); // Adiciona no início para construir o caminho na ordem correta
 
             if (currentNode === startNode) {
                 allPaths.push([...currentPath]);
@@ -98,12 +91,12 @@ class GraphService {
                 const currentDist = distances.get(currentNode);
                 const neighbors = this.graph.get(currentNode) || new Set();
                 for (const neighbor of neighbors) {
-                    if (distances.get(neighbor) === currentDist - 1) {
+                    if (distances.has(neighbor) && distances.get(neighbor) === currentDist - 1) {
                         findPathsDfs(neighbor, currentPath);
                     }
                 }
             }
-            currentPath.shift(); 
+            currentPath.shift(); // Backtrack
         };
 
         findPathsDfs(endNode, []);
@@ -113,11 +106,14 @@ class GraphService {
 
     /**
      * Encontra TODOS os caminhos de uma profundidade exata usando Busca em Profundidade (DFS).
-     * (Método reinserido e atualizado com normalização trim)
+     * @param {string} sourceActor - O nome do ator de origem.
+     * @param {string} targetActor - O nome do ator de destino.
+     * @param {number} exactDepth - A profundidade exata do caminho a ser encontrado.
+     * @returns {object} - Um objeto com a distância e uma lista de todos os caminhos encontrados.
      */
     findFixedLengthPath(sourceActor, targetActor, exactDepth = 8) {
-        const startNode = `Ator: ${sourceActor.trim()}`;
-        const endNode = `Ator: ${targetActor.trim()}`;
+        const startNode = `Ator: ${sourceActor}`;
+        const endNode = `Ator: ${targetActor}`;
 
         if (!this.graph.has(startNode) || !this.graph.has(endNode)) {
             return { error: 'Um ou ambos os atores não foram encontrados no grafo.', paths: [] };
@@ -130,7 +126,7 @@ class GraphService {
 
             if (depth === 0) {
                 if (currentNode === endNode) {
-                    allPaths.push([...path]);
+                    allPaths.push([...path]); // Adiciona uma cópia do caminho encontrado
                 }
                 path.pop(); // Backtrack
                 return;
@@ -157,33 +153,31 @@ class GraphService {
         };
     }
 
-    /**
-     * Gera os dados para visualização do Grafo no Frontend.
-     */
     getFullGraphData() {
-        const nodes = Array.from(this.actorsList).map(actor => ({ 
-            data: { id: actor, label: actor } 
-        }));
-        const edgesMap = new Map();
+    const nodes = Array.from(this.actorsList).map(actor => ({ 
+        data: { id: actor, label: actor } 
+    }));
+    
+    const edgesMap = new Map();
 
-        this.moviesData.forEach(movie => {
-            // Garante a mesma limpeza usada na criação do grafo
-            const cast = [...new Set(movie.cast.map(a => a.trim()))];
-            for (let i = 0; i < cast.length; i++) {
-                for (let j = i + 1; j < cast.length; j++) {
-                    const pair = [cast[i], cast[j]].sort().join('---');
-                    edgesMap.set(pair, (edgesMap.get(pair) || 0) + 1);
-                }
+    // Lógica para contar as conexões (arestas) entre atores
+    this.moviesData.forEach(movie => {
+        const cast = movie.cast;
+        for (let i = 0; i < cast.length; i++) {
+            for (let j = i + 1; j < cast.length; j++) {
+                const pair = [cast[i], cast[j]].sort().join('---');
+                edgesMap.set(pair, (edgesMap.get(pair) || 0) + 1);
             }
-        });
+        }
+    });
 
-        const edges = Array.from(edgesMap.entries()).map(([pair, weight]) => {
-            const [source, target] = pair.split('---');
-            return { data: { source, target, weight, label: weight } };
-        });
+    const edges = Array.from(edgesMap.entries()).map(([pair, weight]) => {
+        const [source, target] = pair.split('---');
+        return { data: { source, target, weight, label: weight } };
+    });
 
-        return { nodes, edges };
-    }
+    return { nodes, edges };
+}
 }
 
 module.exports = new GraphService();
