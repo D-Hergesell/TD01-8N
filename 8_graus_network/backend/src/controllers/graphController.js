@@ -20,7 +20,7 @@ class GraphController {
     }
 
     getShortestPath(req, res) {
-        const { source, target } = req.query; // Mudado para query params para ser mais RESTful
+        const { source, target } = req.query;
         const maxDepth = parseInt(req.query.maxDepth) || 8;
 
         if (!source || !target) {
@@ -28,15 +28,16 @@ class GraphController {
         }
 
         try {
-            // Chama o método corrigido no serviço
-            const result = graphService.findShortestPath(source, target, maxDepth);
+            // SOLUÇÃO AQUI: Trocamos graphService.findShortestPath
+            // por graphService.findAllShortestPaths
+            const result = graphService.findAllShortestPaths(source, target, maxDepth);
 
             if (result.error) {
                 return res.status(404).json(result);
             }
 
-            // Se a distância for -1, significa que não há caminho
-            if (result.distance === -1) {
+            // O retorno agora é uma lista de "paths" em vez de apenas um "path"
+            if (result.distance === -1 || !result.paths || result.paths.length === 0) {
                 return res.status(404).json({ message: result.message || 'Relacionamento inexistente dentro do limite de profundidade.' });
             }
 

@@ -41,11 +41,11 @@ class GraphService {
     }
 
     /**
-     * Algoritmo de Busca em Largura (BFS) para encontrar o menor caminho.
+     * Algoritmo de Busca em Largura (BFS) para encontrar TODOS os menores caminhos.
      * @param {string} sourceActor - O nome do ator de origem.
      * @param {string} targetActor - O nome do ator de destino.
      * @param {number} maxDepth - A profundidade máxima da busca (limite de arestas).
-     * @returns {object} - Um objeto com a distância e o caminho encontrado, ou uma mensagem de erro.
+     * @returns {object} - Um objeto com a distância e os caminhos encontrados.
      */
     findShortestPath(sourceActor, targetActor, maxDepth = 8) {
         const startNode = `Ator: ${sourceActor}`;
@@ -56,33 +56,27 @@ class GraphService {
         }
 
         if (startNode === endNode) {
-            return { distance: 0, path: [startNode] };
+            return { distance: 0, paths: [[startNode]] }; // Note que agora retorna 'paths' no plural
         }
 
-        const queue = [startNode];
-        // O Map de distâncias age como a lista de "visitados".
         const distances = new Map();
+        // O segredo: usamos um Set para mapear MÚLTIPLOS predecessores em caso de empate!
         const predecessors = new Map();
+        const queue = [startNode];
 
         distances.set(startNode, 0);
+        let shortestDistance = -1;
 
         while (queue.length > 0) {
             const currentNode = queue.shift();
             const currentDistance = distances.get(currentNode);
 
-            // Se o nó atual é o destino, encontramos o caminho mais curto.
-            if (currentNode === endNode) {
-                const path = [];
-                let step = endNode;
-                while (step) {
-                    path.unshift(step);
-                    step = predecessors.get(step);
-                }
-                // A distância é o número de arestas, que é o tamanho do caminho - 1.
-                return { distance: path.length - 1, path: path };
+            // Otimização de Ouro: Se já achamos o alvo em um nível anterior,
+            // não exploramos mais nada que seja mais profundo que ele.
+            if (shortestDistance !== -1 && currentDistance >= shortestDistance) {
+                continue;
             }
 
-            // Poda: Não explorar além da profundidade máxima.
             if (currentDistance >= maxDepth) {
                 continue;
             }
@@ -90,19 +84,49 @@ class GraphService {
             const neighbors = this.graph.get(currentNode) || new Set();
 
             for (const neighbor of neighbors) {
-                // BUGFIX: A condição !distances.has(neighbor) é a única necessária.
-                // Isso garante que cada vértice seja enfileirado apenas uma vez,
-                // prevenindo a explosão de memória e processamento redundante.
                 if (!distances.has(neighbor)) {
-                    predecessors.set(neighbor, currentNode);
+                    // Achou o vizinho pela primeira vez
                     distances.set(neighbor, currentDistance + 1);
+                    predecessors.set(neighbor, new Set([currentNode]));
                     queue.push(neighbor);
+
+                    // Se for o destino, gravamos em qual profundidade ele foi achado
+                    if (neighbor === endNode) {
+                        shortestDistance = currentDistance + 1;
+                    }
+                } else if (distances.get(neighbor) === currentDistance + 1) {
+                    // Achou o vizinho DE NOVO, na MESMA profundidade (Caminho alternativo!)
+                    predecessors.get(neighbor).add(currentNode);
                 }
             }
         }
 
-        // Se a fila esvaziar e não tivermos encontrado o destino, não há caminho.
-        return { distance: -1, path: [], message: `Nenhum relacionamento encontrado com menos de ${maxDepth} arestas.` };
+        // Se a fila esvaziar e não tivermos achado nada
+        if (shortestDistance === -1) {
+            return { distance: -1, paths: [], message: `Nenhum relacionamento encontrado com menos de ${maxDepth} arestas.` };
+        }
+
+        // DFS rápido para reconstruir todas as rotas andando de trás pra frente
+        const allPaths = [];
+
+        const buildPaths = (node, currentPath) => {
+            currentPath.unshift(node); // Bota o nó no começo do array
+
+            if (node === startNode) {
+                allPaths.push([...currentPath]); // Caminho completo montado
+            } else {
+                const preds = predecessors.get(node) || new Set();
+                for (const pred of preds) {
+                    buildPaths(pred, currentPath);
+                }
+            }
+
+            currentPath.shift(); // Remove para testar outras ramificações (backtrack)
+        };
+
+        buildPaths(endNode, []);
+
+        return { distance: shortestDistance, paths: allPaths };
     }
 
     /**
