@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8 Graus de Network</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <main class="container">
+        <header>
+            <h1>8 Graus de Network</h1>
+            <p>Encontre o menor caminho entre dois atores/atrizes.</p>
+            <div class="window-controls">
+                <button type="button" class="win-btn" aria-label="Minimizar">_</button>
+                <button type="button" class="win-btn" aria-label="Maximizar">□</button>
+                <button type="button" class="win-btn close-btn" aria-label="Fechar">X</button>
+            </div>
+        </header>
+
+        <form id="pathfinder-form">
+            <div class="input-group">
+                <label for="source-actor">Ator/Atriz de Origem:</label>
+                <input list="actors-list" id="source-actor" name="source-actor" required>
+            </div>
+
+            <div class="input-group">
+                <label for="target-actor">Ator/Atriz de Destino:</label>
+                <input list="actors-list" id="target-actor" name="target-actor" required>
+            </div>
+
+            <datalist id="actors-list"></datalist>
+
+            <div class="button-group">
+                <button type="button" id="find-shortest-btn" class="button">Encontrar Caminho Mais Curto</button>
+                <button type="button" id="find-all-shortest-btn" class="button">Ver Todos os Caminhos Curtos (máx. 8)</button>
+            </div>
+        </form>
+
+        <section id="results-container" aria-live="polite">
+            <!-- Os resultados da busca serão inseridos aqui -->
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+
+    <!-- Barra de Tarefas do Windows XP -->
+    <footer class="taskbar">
+        <div class="start-button">
+            <img src="images/23237-230x219x32.png" alt="start icon">
+            <span>iniciar</span>
+        </div>
+        <div class="taskbar-items">
+            <div class="taskbar-tab active">
+                <img src="images/26795-48x48x32.png" alt="program icon">
+                <span>8 Graus de Network</span>
+            </div>
+        </div>
+        <div class="tray-clock" id="clock"></div>
+    </footer>
+</body>
+</html>
