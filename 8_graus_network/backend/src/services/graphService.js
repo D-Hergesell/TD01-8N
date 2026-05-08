@@ -99,9 +99,12 @@ class GraphService {
             currentPath.shift(); // Backtrack
         };
 
-        findPathsDfs(endNode, []);
+        findPathsDfs(targetActor, []);
 
-        return { distance: shortestDist, paths: allPaths };
+        // Usa a nova função para gerar todas as combinações de filmes (vai restaurar os 3.830)
+        const formattedPaths = this._expandActorPaths(allPaths);
+
+        return { distance: shortestDist, paths: formattedPaths };
     }
 
     /**
@@ -144,12 +147,15 @@ class GraphService {
             path.pop();
         };
 
-        findPathsDfs(startNode, exactDepth, []);
+        findPathsDfs(sourceActor, exactDepth, []);
+
+        // Usa a nova função para gerar todas as combinações de filmes
+        const formattedPaths = this._expandActorPaths(allPaths);
 
         return {
             distance: allPaths.length > 0 ? exactDepth : -1,
-            paths: allPaths,
-            message: allPaths.length === 0 ? `Nenhum relacionamento com exatamente ${exactDepth} conexões encontrado.` : undefined
+            paths: formattedPaths,
+            message: formattedPaths.length === 0 ? `Nenhum relacionamento com exatamente ${exactDepth} arestas encontrado.` : undefined
         };
     }
 
@@ -178,6 +184,35 @@ class GraphService {
 
     return { nodes, edges };
 }
+_expandActorPaths(allPaths) {
+        const finalPaths = [];
+
+        for (const path of allPaths) {
+            // Inicia o caminho com o primeiro ator
+            let expanded = [ [`Ator: ${path[0]}`] ];
+
+            // Passa por cada dupla de atores no caminho
+            for (let i = 0; i < path.length - 1; i++) {
+                const a1 = path[i];
+                const a2 = path[i + 1];
+                const sharedMovies = Array.from(this.graph.get(a1).get(a2));
+
+                const nextExpanded = [];
+                
+                // Para cada caminho que estamos montando, multiplica pelos filmes em comum
+                for (const currentPrefix of expanded) {
+                    for (const movie of sharedMovies) {
+                        nextExpanded.push([...currentPrefix, `Filme: ${movie}`, `Ator: ${a2}`]);
+                    }
+                }
+                expanded = nextExpanded;
+            }
+
+            finalPaths.push(...expanded);
+        }
+
+        return finalPaths;
+    }
 }
 
 module.exports = new GraphService();
