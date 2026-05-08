@@ -15,7 +15,6 @@ class GraphService {
         // Salvamos na classe
         this.moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
-        // CORREÇÃO AQUI: Faltava o "this." bem no começo desta linha!
         this.moviesData.forEach(movie => {
             const movieNode = `Filme: ${movie.title}`;
             if (!this.graph.has(movieNode)) {
@@ -38,95 +37,6 @@ class GraphService {
 
     getAllActors() {
         return Array.from(this.actorsList).sort();
-    }
-
-    /**
-     * Algoritmo de Busca em Largura (BFS) para encontrar TODOS os menores caminhos.
-     * @param {string} sourceActor - O nome do ator de origem.
-     * @param {string} targetActor - O nome do ator de destino.
-     * @param {number} maxDepth - A profundidade máxima da busca (limite de arestas).
-     * @returns {object} - Um objeto com a distância e os caminhos encontrados.
-     */
-    findShortestPath(sourceActor, targetActor, maxDepth = 8) {
-        const startNode = `Ator: ${sourceActor}`;
-        const endNode = `Ator: ${targetActor}`;
-
-        if (!this.graph.has(startNode) || !this.graph.has(endNode)) {
-            return { error: 'Um ou ambos os atores não foram encontrados no grafo.' };
-        }
-
-        if (startNode === endNode) {
-            return { distance: 0, paths: [[startNode]] }; // Note que agora retorna 'paths' no plural
-        }
-
-        const distances = new Map();
-        // O segredo: usamos um Set para mapear MÚLTIPLOS predecessores em caso de empate!
-        const predecessors = new Map();
-        const queue = [startNode];
-
-        distances.set(startNode, 0);
-        let shortestDistance = -1;
-
-        while (queue.length > 0) {
-            const currentNode = queue.shift();
-            const currentDistance = distances.get(currentNode);
-
-            // Otimização de Ouro: Se já achamos o alvo em um nível anterior,
-            // não exploramos mais nada que seja mais profundo que ele.
-            if (shortestDistance !== -1 && currentDistance >= shortestDistance) {
-                continue;
-            }
-
-            if (currentDistance >= maxDepth) {
-                continue;
-            }
-
-            const neighbors = this.graph.get(currentNode) || new Set();
-
-            for (const neighbor of neighbors) {
-                if (!distances.has(neighbor)) {
-                    // Achou o vizinho pela primeira vez
-                    distances.set(neighbor, currentDistance + 1);
-                    predecessors.set(neighbor, new Set([currentNode]));
-                    queue.push(neighbor);
-
-                    // Se for o destino, gravamos em qual profundidade ele foi achado
-                    if (neighbor === endNode) {
-                        shortestDistance = currentDistance + 1;
-                    }
-                } else if (distances.get(neighbor) === currentDistance + 1) {
-                    // Achou o vizinho DE NOVO, na MESMA profundidade (Caminho alternativo!)
-                    predecessors.get(neighbor).add(currentNode);
-                }
-            }
-        }
-
-        // Se a fila esvaziar e não tivermos achado nada
-        if (shortestDistance === -1) {
-            return { distance: -1, paths: [], message: `Nenhum relacionamento encontrado com menos de ${maxDepth} arestas.` };
-        }
-
-        // DFS rápido para reconstruir todas as rotas andando de trás pra frente
-        const allPaths = [];
-
-        const buildPaths = (node, currentPath) => {
-            currentPath.unshift(node); // Bota o nó no começo do array
-
-            if (node === startNode) {
-                allPaths.push([...currentPath]); // Caminho completo montado
-            } else {
-                const preds = predecessors.get(node) || new Set();
-                for (const pred of preds) {
-                    buildPaths(pred, currentPath);
-                }
-            }
-
-            currentPath.shift(); // Remove para testar outras ramificações (backtrack)
-        };
-
-        buildPaths(endNode, []);
-
-        return { distance: shortestDistance, paths: allPaths };
     }
 
     /**

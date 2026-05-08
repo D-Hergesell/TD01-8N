@@ -2,14 +2,6 @@ const graphService = require('../services/graphService');
 
 class GraphController {
 
-    getGraphData (req, res) {
-    try {
-        const graphData = graphService.getFullGraphData();
-        res.json(graphData);
-    } catch (error) {
-        res.status(500).json({ error: 'Erro ao gerar dados do grafo.' });
-    }
-}
     getActors(req, res) {
         try {
             const actors = graphService.getAllActors();
@@ -28,8 +20,6 @@ class GraphController {
         }
 
         try {
-            // SOLUÇÃO AQUI: Trocamos graphService.findShortestPath
-            // por graphService.findAllShortestPaths
             const result = graphService.findAllShortestPaths(source, target, maxDepth);
 
             if (result.error) {
@@ -50,7 +40,7 @@ class GraphController {
 
     getFixedLengthPath(req, res) {
         const { source, target } = req.query;
-        const exactDepth = 8; // Conforme solicitado, busca por 8 conexões exatas.
+        const exactDepth = 8; // Busca por 8 conexões exatas.
 
         if (!source || !target) {
             return res.status(400).json({ error: 'Os parâmetros "source" e "target" são obrigatórios.' });
@@ -82,7 +72,7 @@ class GraphController {
         }
 
         try {
-            // A profundidade máxima (8) já é o padrão no método do serviço
+            // A profundidade máxima (8) já é o padrão no metodo do serviço
             const result = graphService.findAllShortestPaths(source, target);
 
             if (result.error) {
