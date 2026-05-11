@@ -11,86 +11,60 @@ class GraphController {
         }
     }
 
+    /**
+     * Manipula a requisição para encontrar todos os caminhos mais curtos (BFS).
+     */
     getShortestPath(req, res) {
         const { source, target } = req.query;
-        const maxDepth = parseInt(req.query.maxDepth) || 8;
 
         if (!source || !target) {
             return res.status(400).json({ error: 'Os parâmetros "source" e "target" são obrigatórios.' });
         }
 
         try {
-            const result = graphService.findAllShortestPaths(source, target, maxDepth);
-
-            if (result.error) {
-                return res.status(404).json(result);
-            }
-
-            // O retorno agora é uma lista de "paths" em vez de apenas um "path"
-            if (result.distance === -1 || !result.paths || result.paths.length === 0) {
-                return res.status(404).json({ message: result.message || 'Relacionamento inexistente dentro do limite de profundidade.' });
-            }
-
-            res.status(200).json(result);
-        } catch (error) {
-            console.error('Erro no controller ao buscar caminho:', error);
-            res.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
-        }
-    }
-
-    getFixedLengthPath(req, res) {
-        const { source, target } = req.query;
-        const exactDepth = 8; // Busca por 8 conexões exatas.
-
-        if (!source || !target) {
-            return res.status(400).json({ error: 'Os parâmetros "source" e "target" são obrigatórios.' });
-        }
-
-        try {
-            const result = graphService.findFixedLengthPath(source, target, exactDepth);
-
-            if (result.error) {
-                return res.status(404).json(result);
-            }
-
-            if (result.distance === -1 || result.paths.length === 0) {
-                return res.status(404).json({ message: result.message || 'Nenhum caminho com a profundidade exata foi encontrado.' });
-            }
-
-            res.status(200).json({ distance: result.distance, paths: result.paths });
-        } catch (error) {
-            console.error('Erro no controller ao buscar caminho de tamanho fixo:', error);
-            res.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
-        }
-    }
-
-    getAllShortestPaths(req, res) {
-        const { source, target } = req.query;
-
-        if (!source || !target) {
-            return res.status(400).json({ error: 'Os parâmetros "source" e "target" são obrigatórios.' });
-        }
-
-        try {
-            // A profundidade máxima (8) já é o padrão no metodo do serviço
             const result = graphService.findAllShortestPaths(source, target);
 
-            if (result.error) {
-                return res.status(404).json(result);
-            }
-
             if (result.distance === -1 || result.paths.length === 0) {
-                return res.status(404).json({ message: result.message || 'Nenhum caminho encontrado.' });
+                return res.status(404).json({ message: 'Nenhum caminho encontrado.' });
             }
 
             res.status(200).json(result);
         } catch (error) {
-            console.error('Erro no controller ao buscar todos os caminhos mais curtos:', error);
+            console.error('Erro no controller ao buscar caminho mais curto:', error);
             res.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
         }
     }
 
-    
+    /**
+     * Manipula a requisição para encontrar caminhos com até 8 arestas (Busca A*).
+     */
+    getFixedLengthPath(req, res) {
+        const { source, target } = req.query;
+        const maxLength = 8;
+
+        if (!source || !target) {
+            return res.status(400).json({ error: 'Os parâmetros "source" e "target" são obrigatórios.' });
+        }
+
+        try {
+            const result = graphService.findAllPathsUpToLength(source, target, maxLength);
+
+            if (result.paths.length === 0) {
+                return res.status(404).json({ message: `Nenhum caminho com até ${maxLength} arestas foi encontrado.` });
+            }
+            
+            // Para consistência, podemos adicionar a distância do primeiro caminho encontrado, se necessário.
+            const distance = result.paths.length > 0 ? result.paths[0].length - 1 : -1;
+
+            res.status(200).json({
+                distance: distance, // A "distância" aqui pode variar, então usamos a do primeiro resultado.
+                paths: result.paths
+            });
+        } catch (error) {
+            console.error('Erro no controller ao buscar caminhos de tamanho fixo:', error);
+            res.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
+        }
+    }
 }
 
 module.exports = new GraphController();

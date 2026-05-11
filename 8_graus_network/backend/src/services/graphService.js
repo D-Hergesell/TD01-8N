@@ -4,214 +4,202 @@ const path = require('path');
 class GraphService {
     constructor() {
         this.graph = new Map();
-        this.actorsList = new Set();
-        this.moviesData = [];
+        this.types = new Map();
+        this.actorsList = [];
         this.buildGraph();
     }
 
+    /**
+     * Carrega os dados do JSON e constrói o grafo.
+     */
     buildGraph() {
         const dataPath = path.join(__dirname, '../../data/latest_movies.json');
-        
-        // Salvamos na classe
-        this.moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+        const moviesData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
-        this.moviesData.forEach(movie => {
-            const movieNode = `Filme: ${movie.title}`;
-            if (!this.graph.has(movieNode)) {
-                this.graph.set(movieNode, new Set());
-            }
+        this.graph.clear();
+        this.types.clear();
 
-            movie.cast.forEach(actor => {
-                const actorNode = `Ator: ${actor}`;
-                this.actorsList.add(actor);
+        moviesData.forEach((movie) => {
+            if (!movie.id || !movie.title || !Array.isArray(movie.cast)) return;
+            
+            const movieNode = `Filme: ${movie.id} - ${movie.title}`;
+            this._addVertex(movieNode, "filme");
 
-                if (!this.graph.has(actorNode)) {
-                    this.graph.set(actorNode, new Set());
-                }
-
-                this.graph.get(movieNode).add(actorNode);
-                this.graph.get(actorNode).add(movieNode);
+            movie.cast.forEach((actor) => {
+                this._addVertex(actor, "ator");
+                this._addEdge(movieNode, actor);
             });
         });
+
+        this.actorsList = [...this.types.entries()]
+            .filter(([, type]) => type === "ator")
+            .map(([name]) => name)
+            .sort((a, b) => a.localeCompare(b));
+    }
+
+    _addVertex(name, type) {
+        if (!this.graph.has(name)) {
+            this.graph.set(name, new Set());
+            this.types.set(name, type);
+        }
+    }
+
+    _addEdge(source, destination) {
+        this.graph.get(source).add(destination);
+        this.graph.get(destination).add(source);
     }
 
     getAllActors() {
-        return Array.from(this.actorsList).sort();
+        return this.actorsList;
     }
 
     /**
-     * Encontra TODOS os caminhos mais curtos entre dois atores usando BFS + DFS.
-     * @param {string} sourceActor - O nome do ator de origem.
-     * @param {string} targetActor - O nome do ator de destino.
-     * @param {number} maxDepth - A profundidade máxima da busca.
-     * @returns {object} - Um objeto com a distância e uma lista de todos os caminhos mais curtos.
+     * Encontra todos os caminhos mais curtos entre dois atores usando BFS.
      */
-    findAllShortestPaths(sourceActor, targetActor, maxDepth = 8) {
-        const startNode = `Ator: ${sourceActor}`;
-        const endNode = `Ator: ${targetActor}`;
-
-        if (!this.graph.has(startNode) || !this.graph.has(endNode)) {
-            return { error: 'Um ou ambos os atores não foram encontrados no grafo.' };
+    findAllShortestPaths(sourceActor, targetActor) {
+        if (!this.graph.has(sourceActor) || !this.graph.has(targetActor)) {
+            return { distance: -1, paths: [] };
         }
 
-        // Passo 1: BFS para encontrar as distâncias de todos os nós a partir da origem.
-        const distances = new Map();
-        const queue = [startNode];
-        distances.set(startNode, 0);
+        const queue = [sourceActor];
+        const distances = new Map([[sourceActor, 0]]);
+        const predecessors = new Map();
+        let shortestDistance = Infinity;
+        let queueIndex = 0;
 
-        while (queue.length > 0) {
-            const u = queue.shift();
-            const distU = distances.get(u);
+        while (queueIndex < queue.length) {
+            const currentNode = queue[queueIndex++];
+            const currentDist = distances.get(currentNode);
 
-            if (distU >= maxDepth) continue;
+            if (currentDist >= shortestDistance) continue;
 
-            const neighbors = this.graph.get(u) || new Set();
-            for (const v of neighbors) {
-                if (!distances.has(v)) {
-                    distances.set(v, distU + 1);
-                    queue.push(v);
-                }
-            }
-        }
+            const neighbors = [...(this.graph.get(currentNode) || new Set())].sort((a, b) => a.localeCompare(b));
 
-        // Passo 2: Verificar se o destino foi alcançado e reconstruir os caminhos com DFS.
-        if (!distances.has(endNode)) {
-            return { distance: -1, paths: [], message: `Nenhum relacionamento encontrado com menos de ${maxDepth} arestas.` };
-        }
+            for (const neighbor of neighbors) {
+                const newDist = currentDist + 1;
+                if (newDist > shortestDistance) continue;
 
-        const shortestDist = distances.get(endNode);
-        const allPaths = [];
-
-        const findPathsDfs = (currentNode, currentPath) => {
-            currentPath.unshift(currentNode); // Adiciona no início para construir o caminho na ordem correta
-
-            if (currentNode === startNode) {
-                allPaths.push([...currentPath]);
-            } else {
-                const currentDist = distances.get(currentNode);
-                const neighbors = this.graph.get(currentNode) || new Set();
-                for (const neighbor of neighbors) {
-                    if (distances.has(neighbor) && distances.get(neighbor) === currentDist - 1) {
-                        findPathsDfs(neighbor, currentPath);
+                if (!distances.has(neighbor)) {
+                    distances.set(neighbor, newDist);
+                    predecessors.set(neighbor, [currentNode]);
+                    if (neighbor === targetActor) {
+                        shortestDistance = newDist;
+                    } else {
+                        queue.push(neighbor);
+                    }
+                } else if (distances.get(neighbor) === newDist) {
+                    const preds = predecessors.get(neighbor) || [];
+                    if (!preds.includes(currentNode)) {
+                        preds.push(currentNode);
+                        predecessors.set(neighbor, preds);
                     }
                 }
             }
-            currentPath.shift(); // Backtrack
+        }
+
+        if (!distances.has(targetActor)) {
+            return { distance: -1, paths: [] };
+        }
+
+        const paths = this._reconstructPaths(predecessors, sourceActor, targetActor);
+        return { distance: paths.length > 0 ? paths[0].length - 1 : -1, paths };
+    }
+
+    _reconstructPaths(predecessors, source, destination) {
+        const allPaths = [];
+        const reconstructRecursive = (current, pathReversed) => {
+            if (current === source) {
+                allPaths.push([...pathReversed].reverse());
+                return;
+            }
+            const preds = predecessors.get(current) || [];
+            for (const pred of preds) {
+                reconstructRecursive(pred, [...pathReversed, pred]);
+            }
         };
-
-        findPathsDfs(targetActor, []);
-
-        // Usa a nova função para gerar todas as combinações de filmes (vai restaurar os 3.830)
-        const formattedPaths = this._expandActorPaths(allPaths);
-
-        return { distance: shortestDist, paths: formattedPaths };
+        reconstructRecursive(destination, [destination]);
+        return allPaths;
     }
 
     /**
-     * Encontra TODOS os caminhos de uma profundidade exata usando Busca em Profundidade (DFS).
-     * @param {string} sourceActor - O nome do ator de origem.
-     * @param {string} targetActor - O nome do ator de destino.
-     * @param {number} exactDepth - A profundidade exata do caminho a ser encontrado.
-     * @returns {object} - Um objeto com a distância e uma lista de todos os caminhos encontrados.
+     * Encontra todos os caminhos com até `maxLength` arestas usando uma busca A* (guiada).
      */
-    findFixedLengthPath(sourceActor, targetActor, exactDepth = 8) {
-        const startNode = `Ator: ${sourceActor}`;
-        const endNode = `Ator: ${targetActor}`;
-
-        if (!this.graph.has(startNode) || !this.graph.has(endNode)) {
-            return { error: 'Um ou ambos os atores não foram encontrados no grafo.', paths: [] };
+    findAllPathsUpToLength(sourceActor, targetActor, maxLength = 8) {
+        const distancesToTarget = this._calculateDistancesTo(targetActor);
+        if (!distancesToTarget.has(sourceActor) || distancesToTarget.get(sourceActor) > maxLength) {
+            return { paths: [] };
         }
 
-        const allPaths = [];
+        const foundPaths = [];
+        const foundPathsSet = new Set(); // Para garantir a unicidade dos caminhos
 
-        const findPathsDfs = (currentNode, depth, path) => {
-            path.push(currentNode);
+        const searchRecursive = (path) => {
+            const currentNode = path[path.length - 1];
+            const currentDist = path.length - 1;
+            const remainingEdges = maxLength - currentDist;
 
-            if (depth === 0) {
-                if (currentNode === endNode) {
-                    allPaths.push([...path]); // Adiciona uma cópia do caminho encontrado
-                }
-                path.pop(); // Backtrack
+            const shortestDistRemaining = distancesToTarget.get(currentNode);
+            if (shortestDistRemaining === undefined || shortestDistRemaining > remainingEdges) {
                 return;
             }
 
-            const neighbors = this.graph.get(currentNode) || new Set();
-            for (const neighbor of neighbors) {
-                // Evita ciclos no caminho atual para não haver redundâncias
-                if (!path.includes(neighbor)) {
-                    findPathsDfs(neighbor, depth - 1, path);
-                }
-            }
-
-            // Retrocede se nenhum caminho foi encontrado a partir deste nó.
-            path.pop();
-        };
-
-        findPathsDfs(sourceActor, exactDepth, []);
-
-        // Usa a nova função para gerar todas as combinações de filmes
-        const formattedPaths = this._expandActorPaths(allPaths);
-
-        return {
-            distance: allPaths.length > 0 ? exactDepth : -1,
-            paths: formattedPaths,
-            message: formattedPaths.length === 0 ? `Nenhum relacionamento com exatamente ${exactDepth} arestas encontrado.` : undefined
-        };
-    }
-
-    getFullGraphData() {
-    const nodes = Array.from(this.actorsList).map(actor => ({ 
-        data: { id: actor, label: actor } 
-    }));
-    
-    const edgesMap = new Map();
-
-    // Lógica para contar as conexões (arestas) entre atores
-    this.moviesData.forEach(movie => {
-        const cast = movie.cast;
-        for (let i = 0; i < cast.length; i++) {
-            for (let j = i + 1; j < cast.length; j++) {
-                const pair = [cast[i], cast[j]].sort().join('---');
-                edgesMap.set(pair, (edgesMap.get(pair) || 0) + 1);
-            }
-        }
-    });
-
-    const edges = Array.from(edgesMap.entries()).map(([pair, weight]) => {
-        const [source, target] = pair.split('---');
-        return { data: { source, target, weight, label: weight } };
-    });
-
-    return { nodes, edges };
-}
-_expandActorPaths(allPaths) {
-        const finalPaths = [];
-
-        for (const path of allPaths) {
-            // Inicia o caminho com o primeiro ator
-            let expanded = [ [`Ator: ${path[0]}`] ];
-
-            // Passa por cada dupla de atores no caminho
-            for (let i = 0; i < path.length - 1; i++) {
-                const a1 = path[i];
-                const a2 = path[i + 1];
-                const sharedMovies = Array.from(this.graph.get(a1).get(a2));
-
-                const nextExpanded = [];
-                
-                // Para cada caminho que estamos montando, multiplica pelos filmes em comum
-                for (const currentPrefix of expanded) {
-                    for (const movie of sharedMovies) {
-                        nextExpanded.push([...currentPrefix, `Filme: ${movie}`, `Ator: ${a2}`]);
+            if (currentNode === targetActor) {
+                if (currentDist > 0 && currentDist <= maxLength) {
+                    const pathKey = path.join('||');
+                    if (!foundPathsSet.has(pathKey)) {
+                        foundPaths.push([...path]);
+                        foundPathsSet.add(pathKey);
                     }
                 }
-                expanded = nextExpanded;
+                return;
             }
+            
+            if (currentDist === maxLength) return;
 
-            finalPaths.push(...expanded);
+            const neighbors = [...(this.graph.get(currentNode) || new Set())]
+                .filter(neighbor => {
+                    if (path.includes(neighbor)) return false;
+                    const dist = distancesToTarget.get(neighbor);
+                    return dist !== undefined && dist <= remainingEdges - 1;
+                })
+                .sort((a, b) => {
+                    const distA = distancesToTarget.get(a) ?? Infinity;
+                    const distB = distancesToTarget.get(b) ?? Infinity;
+                    return distA !== distB ? distA - distB : a.localeCompare(b);
+                });
+
+            for (const neighbor of neighbors) {
+                path.push(neighbor);
+                searchRecursive(path);
+                path.pop(); // Backtrack
+            }
+        };
+
+        searchRecursive([sourceActor]);
+        return { paths: foundPaths };
+    }
+
+    /**
+     * Calcula a distância de todos os nós alcançáveis até um nó de destino (BFS reverso).
+     */
+    _calculateDistancesTo(destination) {
+        const distances = new Map([[destination, 0]]);
+        const queue = [destination];
+        let queueIndex = 0;
+
+        while (queueIndex < queue.length) {
+            const currentNode = queue[queueIndex++];
+            const currentDist = distances.get(currentNode);
+            const neighbors = this.graph.get(currentNode) || new Set();
+
+            for (const neighbor of neighbors) {
+                if (!distances.has(neighbor)) {
+                    distances.set(neighbor, currentDist + 1);
+                    queue.push(neighbor);
+                }
+            }
         }
-
-        return finalPaths;
+        return distances;
     }
 }
 
