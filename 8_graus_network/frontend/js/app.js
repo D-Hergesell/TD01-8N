@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const loadingMsg = endpoint === '/path' ? 'Buscando BFS...' : 'Buscando BFS 8...';
+        const loadingMsg = endpoint === '/path' ? 'Buscando o caminho mais curto (BFS)...' : 'Buscando todos os caminhos (A*)...';
         resultsContainer.innerHTML = `<p>${loadingMsg}</p>`;
 
         try {
@@ -46,28 +46,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const { distance, path, paths } = data;
+        const { distance, paths } = data;
         const degrees = Math.ceil(distance / 2);
-        const pathList = paths || (path ? [path] : []);
+        const pathList = paths || [];
         const total = pathList.length;
-        const isBFS8 = endpoint === '/path/exact';
+        const isExactPath = endpoint === '/path/exact';
 
-        let html = `<h2>Conexão Encontrada!</h2><p><strong>Graus de separação:</strong> ${degrees}</p>`;
+        let html = `<h2>Conexão Encontrada!</h2>
+                    <p><strong>Graus de separação:</strong> ${degrees}</p>
+                    <p><strong>Total de arestas:</strong> ${distance}</p>`;
 
-        if (isBFS8) {
-            html += `<p><strong>Total de resultados (BFS 8):</strong> ${total}</p>`;
+        if (isExactPath) {
+            html += `<p><strong>Total de caminhos encontrados:</strong> ${total}</p>`;
         } else if (total > 1) {
-            html += `<p><strong>Total de resultados:</strong> ${total}</p>`;
+            html += `<p><strong>Total de caminhos (mínimos):</strong> ${total}</p>`;
         }
 
         pathList.forEach((currentPath, index) => {
             if (total > 1) html += `<h3>Caminho ${index + 1}</h3>`;
 
-            // Mapeia cada item do caminho para uma etiqueta estilizada
             const formattedPath = currentPath.map(node => {
-                const isActor = node.startsWith('Ator: ');
-                const name = node.replace('Ator: ', '').replace('Filme: ', '');
-                const tagClass = isActor ? 'xp-tag-actor' : 'xp-tag-movie';
+                const isMovie = node.startsWith('Filme:');
+                const name = node.replace(/Filme: \d+ - /g, ''); // Remove o ID do filme para a exibição
+                const tagClass = isMovie ? 'xp-tag-movie' : 'xp-tag-actor';
 
                 return `<span class="xp-tag ${tagClass}">${name}</span>`;
             }).join('<span class="xp-arrow"> ➔ </span>');
